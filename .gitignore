@@ -1,6 +1,0 @@
-*.zip
-.idea/
-__pycache__/
-*.pkl
-*.h5
-*.pt
