@@ -107,3 +107,14 @@ output_path = 'D:/Users/nickt/ECO482/Research Project Files/Cleaning/FRED_MD_Cle
 df.to_csv(output_path, index=False)
 
 print(f"Cleaned data exported successfully to: {output_path}")
+
+###############################################################
+# This function can be imported into the EDA and modeling scripts 
+# to load the cleaned dataset and prepare the feature matrix X and target vector y.
+###############################################################
+
+def load_data(path):
+    df = pd.read_csv(path)
+    X = df.drop(columns=['sasdate', 'Slope', 'Inversion', 'Target_6M'])
+    y = df['Target_6M']
+    return X, y
