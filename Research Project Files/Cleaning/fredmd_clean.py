@@ -47,7 +47,7 @@ df = df.iloc[1:]
 
 ## Dropping data before January 1972 and after January 2025 due to many missing entries:
 df['sasdate'] = pd.to_datetime(df['sasdate'])
-df = df[(df['sasdate'] >= '1972-01-01') & (df['sasdate'] <= '2025-01-01')]
+df = df[(df['sasdate'] >= '1973-01-01') & (df['sasdate'] <= '2025-01-01')]
 
 # Export a non-transformed version of the cleaned dataset for use in EDA and modeling scripts.
 output_path = 'D:/Users/nickt/ECO482/Research Project Files/Data'

@@ -8,10 +8,11 @@
 import pickle
 
 import pandas as pd
+import numpy as np
+
 from sklearn.base import clone
 from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
 from sklearn.metrics import accuracy_score, recall_score, precision_score, roc_auc_score, average_precision_score
-from sklearn.linear_model import Ridge, Lasso
 from sklearn.ensemble import RandomForestClassifier
 
 from xgboost import XGBClassifier
@@ -22,21 +23,19 @@ from xgboost import XGBClassifier
 
 df = pd.read_csv("D:/Users/nickt/ECO482/Research Project Files/Data/FRED_MD_Cleaned_Transformed.csv")
 
+###############################################################
+# Define variables 
+###############################################################
+
 y = df['Target_6M']
-X = df.drop(columns=['Target_6M', 'sasdate', 'Inversion', 'Slope'])
-
-###############################################################
-# Random Walk
-###############################################################
-
-df['random_walk'] = df['Inversion']
+X = df.drop(columns=['Target_6M', 'sasdate', 'Slope'])
 
 ###############################################################
 # XGBoost and Random Forest 
 ###############################################################
 
-tscv = TimeSeriesSplit(n_splits=5)
-xgb = XGBClassifier(random_state=42, eval_metric='logloss')
+tscv = TimeSeriesSplit(n_splits=2)
+xgb = XGBClassifier(random_state=42)
 rf = RandomForestClassifier(random_state=42)
 
 ###############################################################
@@ -44,21 +43,44 @@ rf = RandomForestClassifier(random_state=42)
 ###############################################################
 
 # Define hyperparameter grids to search over
-param_grids = {'XGBoost':
-    {"n_estimators": [100, 300],
-    "max_depth": [3, 4, 6],           # XGBoost trees should generally be shallower than RF's
-    "learning_rate": [0.01, 0.05, 0.1],
-    "subsample": [0.7, 0.9],          # row sampling per tree — helps prevent overfitting
-    "colsample_bytree": [0.7, 0.9],   # feature sampling per tree — helps with your many correlated features
-    "scale_pos_weight": [0.13]     # set to (# negative / # positive) for class imbalance (82 / 618),
-    },
+# param_grids = {'XGBoost':
+#     {"max_depth": [1, 3, 5, 7, 10],           # XGBoost trees should generally be shallower than RF's
+#     "learning_rate": [0.1, 0.5, 1],
+#     "colsample_bytree": [0.7, 0.9, 1],   # feature sampling per tree — helps with your many correlated features 
+#     "reg_alpha": [1, 3, 5, 10],       # regularization parameter (Lasso) L1
+#     "reg_lambda": [1, 3, 5, 10],      # regularization parameter (Ridge) L2
+#     "scale_pos_weight": [6.54],
+#     'max_delta_step': [1]
+#     },
                
-    'Random Forest':     
-    {"n_estimators": [200, 500],       # more trees = more stable, diminishing returns past ~500
-    "max_depth": [4, 6, 8, None],     # shallower = less overfitting on a small dataset
-    "min_samples_leaf": [5, 10, 20],  # higher = smoother, less likely to memorize noise
-    "max_features": ["sqrt", 0.5],    # limits features considered per split
-    "class_weight": ["balanced"]      # important given inversion class imbalance}
+#     'Random Forest':     
+#     {"n_estimators": [100, 200, 500],   # more trees = more stable, diminishing returns past ~500
+#      'criterion': ['gini', 'entropy'], 
+#     "max_depth": [2, 4, 6],             # shallower = less overfitting on a small dataset
+#     "min_samples_leaf": [5, 10, 20],  # higher = smoother, less likely to memorize noise
+#     "max_features": ["sqrt", 0.5],    # limits features considered per split
+#     "class_weight": ["balanced"]      # important given inversion class imbalance
+#     }
+# }
+
+param_grids = {
+    'XGBoost': {
+        "max_depth": [1, 2, 3],                    # confirm 1 is genuinely optimal, not a fluke
+        "learning_rate": [0.01, 0.05, 0.1, 0.3],    # extend below the old floor of 0.1
+        "colsample_bytree": [0.7, 0.9, 1],          # kept as-is — already an interior optimum
+        "reg_alpha": [5, 10, 20, 40],               # extend above old ceiling of 10
+        "reg_lambda": [5, 10, 20, 40],               # extend above old ceiling of 10
+        "scale_pos_weight": [6.5, 10, 15, 20],      # now a real range instead of fixed
+        "max_delta_step": [1]
+    },
+
+    'Random Forest': {
+        "n_estimators": [50, 100, 200],             # extend below old floor of 100
+        "criterion": ["gini", "entropy"],
+        "max_depth": [2, 3, 4],                     # extend slightly above old floor of 2
+        "min_samples_leaf": [3, 5, 10],              # extend below old floor of 5
+        "max_features": ["sqrt", 0.5],
+        "class_weight": ["balanced"]
     }
 }
 
@@ -76,7 +98,7 @@ for model_name, model in models.items():
         estimator = model,
         param_grid = param_grids[model_name],
         cv = tscv,
-        scoring = 'recall',
+        scoring = 'f1',
         n_jobs = -1,
         verbose = 1
     )
@@ -90,7 +112,7 @@ for model_name, model in models.items():
     results_summary.append({
         'model': model_name,
         'best_params': grid_search.best_params_,
-        'best_cv_recall': grid_search.best_score_
+        'best_cv_avg_precision': grid_search.best_score_
     })
 
     # Evaluate the best model on each time-series fold and save the outputs
@@ -122,7 +144,34 @@ for model_name, model in models.items():
         })
 
     print(f"Best parameters for {model_name}: {grid_search.best_params_}")
-    print(f"Best cross-validation Recall Score: {grid_search.best_score_:.3f}\n")
+    print(f"Best cross-validation Average Precision Score: {grid_search.best_score_:.3f}\n")
+
+###############################################################
+# Random Walk Baseline (evaluated on same folds as XGB/RF)
+###############################################################
+
+rw_evaluation_results = []
+
+for fold, (train_idx, test_idx) in enumerate(tscv.split(X), start=1):
+    y_test = y.iloc[test_idx]
+
+    # Random walk prediction: sign of slope at t-6 (already a column in X)
+    # adjust the column name below to match whatever you called it
+    rw_pred = (X['Inversion'].iloc[test_idx] > 0).astype(int)
+
+    rw_evaluation_results.append({
+        'model': 'Random Walk',
+        'fold': fold,
+        'accuracy': accuracy_score(y_test, rw_pred),
+        'recall': recall_score(y_test, rw_pred, zero_division=0),
+        'precision': precision_score(y_test, rw_pred, zero_division=0),
+        'y_true': y_test.to_numpy(),
+        'y_pred': rw_pred.to_numpy(),
+    })
+
+# fold RW results into your existing results list, so everything downstream
+# (confusion matrix plotting, summary tables) can treat it like any other model
+evaluation_results.extend(rw_evaluation_results)
 
 ###############################################################
 # Export the models and results to a pickle file
