@@ -65,12 +65,12 @@ rf = RandomForestClassifier(random_state=42)
 
 param_grids = {
     'XGBoost': {
-        "max_depth": [1, 2, 3],                    # confirm 1 is genuinely optimal, not a fluke
-        "learning_rate": [0.01, 0.05, 0.1, 0.3],    # extend below the old floor of 0.1
+        "max_depth": [2, 3, 5],                    # confirm 1 is genuinely optimal, not a fluke
+        "learning_rate": [0.05, 0.1, 0.3, 0.5],    # extend below the old floor of 0.1
         "colsample_bytree": [0.7, 0.9, 1],          # kept as-is — already an interior optimum
-        "reg_alpha": [5, 10, 20, 40],               # extend above old ceiling of 10
-        "reg_lambda": [5, 10, 20, 40],               # extend above old ceiling of 10
-        "scale_pos_weight": [6.5, 10, 15, 20],      # now a real range instead of fixed
+        "reg_alpha": [2, 5, 10, 20],               # extend above old ceiling of 10
+        "reg_lambda": [2, 5, 10, 20],               # extend above old ceiling of 10
+        "scale_pos_weight": [6.5, 10],      # now a real range instead of fixed
         "max_delta_step": [1]
     },
 
@@ -80,7 +80,7 @@ param_grids = {
         "max_depth": [2, 3, 4],                     # extend slightly above old floor of 2
         "min_samples_leaf": [3, 5, 10],              # extend below old floor of 5
         "max_features": ["sqrt", 0.5],
-        "class_weight": ["balanced"]
+        "class_weight": ['balanced', 'balanced_subsample']
     }
 }
 
@@ -128,7 +128,7 @@ for model_name, model in models.items():
         else:
             y_proba = model_fold.decision_function(X_test)
 
-        y_pred = (y_proba >= 0.5).astype(int)
+        y_pred = (y_proba >= 0.45).astype(int)
 
         evaluation_results.append({
             'model': model_name,
