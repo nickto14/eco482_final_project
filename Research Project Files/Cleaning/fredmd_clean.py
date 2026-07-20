@@ -14,10 +14,11 @@ import numpy as np
 
 df = pd.read_csv('D:/Users/nickt/ECO482/Research Project Files/Data/2026-01-MD.csv')
 
-## Create Slope Variable: Slope_V = 10Y - 3M 
-
+## Create Slope Variable: Slope_V = 10Y - 3M. 
 df['Slope'] = df['GS10'] - df['TB3MS']
 df['Slope'] = df['Slope'].round(5)
+
+## We create the 'Inversion' variable, which is 1 if the slope is negative and 0 otherwise. This is our I_t from the report.
 df['Inversion'] = (df['Slope'] < 0).astype(int)
 
 ###############################################################
@@ -84,7 +85,7 @@ df.dropna(inplace=True)
 # target variable for prediction.
 ###############################################################
 
-## shift(-6) moves values from the future into the current row
+## shift(-6) moves values from the future into the current row. This is our Y_t from the report. 
 df['Target_6M'] = df['Inversion'].shift(-6)
 
 ## The last 6 months (Aug 2024 - Jan 2025) will have NaN for 'Target_6M', so drop them

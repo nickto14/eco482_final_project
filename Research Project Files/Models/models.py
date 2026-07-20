@@ -42,43 +42,22 @@ rf = RandomForestClassifier(random_state=42)
 # Hyperparameter Optimization via GridSearchCV
 ###############################################################
 
-# Define hyperparameter grids to search over
-# param_grids = {'XGBoost':
-#     {"max_depth": [1, 3, 5, 7, 10],           # XGBoost trees should generally be shallower than RF's
-#     "learning_rate": [0.1, 0.5, 1],
-#     "colsample_bytree": [0.7, 0.9, 1],   # feature sampling per tree — helps with your many correlated features 
-#     "reg_alpha": [1, 3, 5, 10],       # regularization parameter (Lasso) L1
-#     "reg_lambda": [1, 3, 5, 10],      # regularization parameter (Ridge) L2
-#     "scale_pos_weight": [6.54],
-#     'max_delta_step': [1]
-#     },
-               
-#     'Random Forest':     
-#     {"n_estimators": [100, 200, 500],   # more trees = more stable, diminishing returns past ~500
-#      'criterion': ['gini', 'entropy'], 
-#     "max_depth": [2, 4, 6],             # shallower = less overfitting on a small dataset
-#     "min_samples_leaf": [5, 10, 20],  # higher = smoother, less likely to memorize noise
-#     "max_features": ["sqrt", 0.5],    # limits features considered per split
-#     "class_weight": ["balanced"]      # important given inversion class imbalance
-#     }
-# }
-
 param_grids = {
     'XGBoost': {
-        "max_depth": [2, 3, 5],                    # confirm 1 is genuinely optimal, not a fluke
-        "learning_rate": [0.05, 0.1, 0.3, 0.5],    # extend below the old floor of 0.1
-        "colsample_bytree": [0.7, 0.9, 1],          # kept as-is — already an interior optimum
-        "reg_alpha": [2, 5, 10, 20],               # extend above old ceiling of 10
-        "reg_lambda": [2, 5, 10, 20],               # extend above old ceiling of 10
-        "scale_pos_weight": [6.5, 10],      # now a real range instead of fixed
+        "max_depth": [2, 3, 5],                    
+        "learning_rate": [0.05, 0.1, 0.3, 0.5],
+        "colsample_bytree": [0.7, 0.9, 1],          
+        "reg_alpha": [2, 5, 10, 20],
+        "reg_lambda": [2, 5, 10, 20],
+        "scale_pos_weight": [6.5, 10],
         "max_delta_step": [1]
     },
 
     'Random Forest': {
-        "n_estimators": [50, 100, 200],             # extend below old floor of 100
+        "n_estimators": [50, 100, 200],
         "criterion": ["gini", "entropy"],
-        "max_depth": [2, 3, 4],                     # extend slightly above old floor of 2
-        "min_samples_leaf": [3, 5, 10],              # extend below old floor of 5
+        "max_depth": [2, 3, 4],
+        "min_samples_leaf": [3, 5, 10],
         "max_features": ["sqrt", 0.5],
         "class_weight": ['balanced', 'balanced_subsample']
     }
@@ -154,11 +133,7 @@ rw_evaluation_results = []
 
 for fold, (train_idx, test_idx) in enumerate(tscv.split(X), start=1):
     y_test = y.iloc[test_idx]
-
-    # Random walk prediction: sign of slope at t-6 (already a column in X)
-    # adjust the column name below to match whatever you called it
     rw_pred = (X['Inversion'].iloc[test_idx] > 0).astype(int)
-
     rw_evaluation_results.append({
         'model': 'Random Walk',
         'fold': fold,
@@ -168,9 +143,6 @@ for fold, (train_idx, test_idx) in enumerate(tscv.split(X), start=1):
         'y_true': y_test.to_numpy(),
         'y_pred': rw_pred.to_numpy(),
     })
-
-# fold RW results into your existing results list, so everything downstream
-# (confusion matrix plotting, summary tables) can treat it like any other model
 evaluation_results.extend(rw_evaluation_results)
 
 ###############################################################
